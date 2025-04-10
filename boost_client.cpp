@@ -34,7 +34,7 @@ int main()
 #include <stdlib.h>
 #include <unistd.h>
         // 设置 CPU 亲和性
-        cpu_set_t mask;
+    cpu_set_t mask;
     CPU_ZERO(&mask);   // 清空 CPU 集合
     CPU_SET(1, &mask); // 设置 CPU 核心 1
     // 设置当前进程的 CPU 亲和性
@@ -126,7 +126,7 @@ int main()
         // 在 while 循环中实现忙等待
         while (ws.next_layer().next_layer().available() == 0)
         {
-            std::this_thread::sleep_for(std::chrono::nanoseconds(500)); // 短暂休眠以避免 100% CPU 占用
+            std::this_thread::sleep_for(std::chrono::nanoseconds(100)); // 短暂休眠以避免 100% CPU 占用
         }
 
         // 读取消息
