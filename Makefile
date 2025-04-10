@@ -5,7 +5,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall -I/usr/local/include
 
 # 定义链接选项
-LDFLAGS = -L/usr/local/lib -lboost_system
+LDFLAGS = -L/usr/local/lib -lboost_system -lspdlog -lfmt -lssl -lcrypto -lsimdjson -pthread
 
 # 定义目标文件
 TARGET = boost_client
