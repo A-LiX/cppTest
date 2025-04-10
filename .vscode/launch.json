@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Run and Debug C++",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/test",  // 编译后的可执行文件
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,  // 使用外部终端
+            "MIMode": "gdb",  // 调试器
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build and Run C++ File",  // 编译后运行
+        }
+    ]
+}

@@ -1,0 +1,3 @@
+/Users/lixiang/cppTest/ninja_build/CMakeFiles/cppTest.dir
+/Users/lixiang/cppTest/ninja_build/CMakeFiles/edit_cache.dir
+/Users/lixiang/cppTest/ninja_build/CMakeFiles/rebuild_cache.dir

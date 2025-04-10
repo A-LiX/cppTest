@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/lixiang/cppTest/build",
+  "command": "/usr/bin/g++ -g -std=gnu++17 -arch arm64 -o CMakeFiles/cppTest.dir/test.cpp.o -c /Users/lixiang/cppTest/test.cpp",
+  "file": "/Users/lixiang/cppTest/test.cpp",
+  "output": "CMakeFiles/cppTest.dir/test.cpp.o"
+}
+]
