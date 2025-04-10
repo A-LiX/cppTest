@@ -1,21 +1,22 @@
-# 编译器
+# 定义编译器
 CXX = g++
-# 编译选项
-CXXFLAGS = -std=c++17 -I/opt/homebrew/include -L/opt/homebrew/lib -pthread
-# 链接的库
-LIBS = -lspdlog -lfmt -lssl -lcrypto -lsimdjson
-# 目标文件
+
+# 定义编译选项
+CXXFLAGS = -std=c++11 -Wall -I/usr/local/include
+
+# 定义链接选项
+LDFLAGS = -L/usr/local/lib -lboost_system
+
+# 定义目标文件
 TARGET = boost_client
-# 源文件
-SRC = boost_client.cpp
 
-# 默认目标
-all: $(TARGET)
+# 定义源文件
+SRCS = boost_client.cpp
 
-# 编译目标
-$(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS)
+# 定义目标文件依赖关系
+$(TARGET): $(SRCS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
 
-# 清理目标
+# 清理生成的文件
 clean:
 	rm -f $(TARGET)
