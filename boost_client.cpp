@@ -126,7 +126,7 @@ int main()
         // 在 while 循环中实现忙等待
         while (ws.next_layer().next_layer().available() == 0)
         {
-            std::this_thread::sleep_for(std::chrono::nanoseconds(100)); // 短暂休眠以避免 100% CPU 占用
+            //std::this_thread::sleep_for(std::chrono::nanoseconds(100)); // 短暂休眠以避免 100% CPU 占用
         }
 
         // 读取消息

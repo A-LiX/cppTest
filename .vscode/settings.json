@@ -1,6 +1,6 @@
 {
     "code-runner.executorMap": {
-        "cpp": " clear && /usr/bin/g++ -std=c++17 -I/opt/homebrew/include -L/opt/homebrew/lib /Users/lixiang/cppTest/boost_client.cpp -o /Users/lixiang/cppTest/boost_client  -lspdlog -lfmt -lssl -lcrypto -lsimdjson -pthread && sudo /Users/lixiang/cppTest/boost_client"
+        "cpp": " clear && /usr/bin/g++ -std=c++17 -I/opt/homebrew/include -L/opt/homebrew/lib /Users/lixiang/cppTest/boost_client.cpp -o /Users/lixiang/cppTest/boost_client  -lspdlog -lfmt -lssl -lcrypto -lsimdjson -pthread && /Users/lixiang/cppTest/boost_client"
     },
     "code-runner.runInTerminal": true,
     "files.associations": {
