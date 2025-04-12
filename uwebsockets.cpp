@@ -4,6 +4,11 @@
 
 using namespace uWS;
 
+// 定义 PerSocketData 结构体，用于存储每个 WebSocket 连接的数据
+struct PerSocketData {
+    // 可以在这里定义需要存储的数据
+};
+
 int main() {
     // 初始化 simdjson 解析器
     simdjson::ondemand::parser parser;
@@ -13,16 +18,16 @@ int main() {
 
     // 定义 WebSocket 客户端行为
     app.ws<PerSocketData>("/*", {
-        .compression = DISABLED,
-        .maxPayloadLength = 16 * 1024,
+        .compression = uWS::DISABLED, // 禁用压缩
+        .maxPayloadLength = 16 * 1024, // 设置最大负载长度
         .open = [](auto* ws) {
             std::cout << "Connected to Binance!" << std::endl;
 
             // 发送订阅请求
             const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
-            ws->send(subscribeMsg, OpCode::TEXT);
+            ws->send(subscribeMsg, uWS::OpCode::TEXT);
         },
-        .message = [&parser](auto* ws, std::string_view message, OpCode opCode) {
+        .message = [&parser](auto* ws, std::string_view message, uWS::OpCode opCode) {
             // 使用 simdjson 解析消息
             simdjson::padded_string_view json_view(message.data(), message.size());
             simdjson::ondemand::document doc;
@@ -47,7 +52,10 @@ int main() {
     });
 
     // 发起 WebSocket 连接
-    app.connect("wss://stream.binance.com:9443/ws/btcusdt@trade", nullptr, {}, 5000);
+    app.connect("wss://stream.binance.com:9443/ws/btcusdt@trade", [](auto* res, auto* req) {
+        // 处理连接成功后的逻辑
+        std::cout << "WebSocket connection established!" << std::endl;
+    });
 
     // 运行事件循环
     app.run();
