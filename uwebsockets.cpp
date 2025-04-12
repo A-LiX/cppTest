@@ -7,11 +7,14 @@ int main() {
 
     simdjson::ondemand::parser parser;
 
-    uWS::App().connect("wss://stream.binance.com:9443/ws/btcusdt@trade", nullptr, {}, 
-        [](auto *ws, uWS::WebSocketState<false, true, PerSocketData> *) {
+    // 使用新版 uWebSockets 连接方式
+    uWS::App().ws<PerSocketData>("/ws", {
+        // 连接时触发的事件
+        .open = [](auto *ws) {
             std::cout << "✅ Connected to Binance WebSocket\n";
         },
-        [&parser](auto *ws, std::string_view message, uWS::OpCode) {
+        // 消息到来时触发的事件
+        .message = [&parser](auto *ws, std::string_view message, uWS::OpCode) {
             try {
                 simdjson::padded_string padded(message);
                 auto doc = parser.iterate(padded);
@@ -24,12 +27,13 @@ int main() {
                 std::cerr << "❌ simdjson parse error: " << e.what() << "\n";
             }
         },
-        nullptr, nullptr,
-        [](auto *ws, int code, std::string_view msg) {
+        // 连接关闭时触发的事件
+        .close = [](auto *ws, int code, std::string_view msg) {
             std::cout << "🔌 Disconnected: " << code << ", " << msg << "\n";
         }
-    );
+    }).connect("wss://stream.binance.com:9443/ws/btcusdt@trade", nullptr);
 
+    // 运行事件循环
     uWS::Loop::get()->run();
     return 0;
 }
