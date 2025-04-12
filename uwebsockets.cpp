@@ -27,27 +27,8 @@ int main() {
             const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
             ws->send(subscribeMsg, uWS::OpCode::TEXT);
         },
-        .message = [&parser](auto* ws, std::string_view message, uWS::OpCode opCode) {
+        .message = [](auto* ws, std::string_view message, uWS::OpCode opCode) {
             std::cout << "Received message: " << message << std::endl;
-
-            // 使用 simdjson 解析消息
-            simdjson::padded_string_view json_view(message.data(), message.size());
-            simdjson::ondemand::document doc;
-
-            if (auto error = parser.iterate(json_view).get(doc)) {
-                std::cerr << "JSON Parse Error: " << error << std::endl;
-                std::cerr << "Raw message: " << message << std::endl;
-                return;
-            }
-
-            simdjson::ondemand::value price, quantity;
-            if (!doc["p"].get(price) && !doc["q"].get(quantity)) {
-                std::cout << "BTC/USDT Price: " << price.get_string().value() 
-                          << ", Quantity: " << quantity.get_string().value() 
-                          << std::endl;
-            } else {
-                std::cerr << "Invalid trade data format" << std::endl;
-            }
         },
         .close = [](auto* ws, int code, std::string_view msg) {
             std::cout << "Disconnected. Code: " << code << std::endl;
@@ -55,15 +36,10 @@ int main() {
     });
 
     // 发起 WebSocket 连接
-    app.listen(3000, [](auto* listenSocket) {
-        if (listenSocket) {
-            std::cout << "Listening on port 3000" << std::endl;
-        }
-    });
-
-    app.connect("wss://stream.binance.com:9443/ws/btcusdt@trade", [](auto* res, auto* req) {
+    app.connect("wss://stream.binance.com:9443/stream?streams=", [](auto* res, auto* req) {
         std::cout << "WebSocket connection established!" << std::endl;
     });
+
     // 运行事件循环
     std::cout << "Starting event loop..." << std::endl;
     app.run();
