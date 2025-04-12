@@ -1,39 +1,60 @@
-#include <uwebsockets/App.h>
-#include <simdjson.h>
+#include <uWebSockets/App.h>
 #include <iostream>
+#include <simdjson.h>  // 使用 simdjson 替代 jsoncpp
+
+using namespace uWS;
 
 int main() {
-    struct PerSocketData {};
+    struct PerSocketData { /* 会话数据（可选） */ };
 
+    // 初始化 simdjson 解析器（线程安全）
     simdjson::ondemand::parser parser;
+    uWS::Loop* loop = uWS::Loop::get();
 
-    // 使用新版 uWebSockets 连接方式
-    uWS::App().ws<PerSocketData>("/ws", {
-        // 连接时触发的事件
-        .open = [](auto *ws) {
-            std::cout << "✅ Connected to Binance WebSocket\n";
+    WebSocket<false, true, PerSocketData>* ws = nullptr;
+
+    WebSocketBehavior behavior{
+        .compression = uWS::DISABLED,
+        .maxPayloadLength = 16 * 1024,
+        .open = [&ws](WebSocket<false, true, PerSocketData>* webSocket) {
+            std::cout << "Connected to Binance!" << std::endl;
+            ws = webSocket;
+
+            // 订阅 BTC/USDT 交易流
+            const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
+            webSocket->send(subscribeMsg, uWS::OpCode::TEXT);
         },
-        // 消息到来时触发的事件
-        .message = [&parser](auto *ws, std::string_view message, uWS::OpCode) {
-            try {
-                simdjson::padded_string padded(message);
-                auto doc = parser.iterate(padded);
+        .message = [&parser](WebSocket<false, true, PerSocketData>* webSocket, 
+                            std::string_view message, 
+                            uWS::OpCode opCode) {
+            // 使用 simdjson 解析消息
+            simdjson::padded_string_view json_view(message.data(), message.size());
+            simdjson::ondemand::document doc;
 
-                std::string_view price = doc["p"].get_string().value();
-                std::string_view qty   = doc["q"].get_string().value();
+            // 尝试解析 JSON
+            if (auto error = parser.iterate(json_view).get(doc)) {
+                std::cerr << "JSON Parse Error: " << error << std::endl;
+                return;
+            }
 
-                std::cout << "📈 Price: " << price << " | Qty: " << qty << "\n";
-            } catch (const simdjson::simdjson_error &e) {
-                std::cerr << "❌ simdjson parse error: " << e.what() << "\n";
+            // 提取交易价格和数量（直接访问字段）
+            simdjson::ondemand::value price, quantity;
+            if (!doc["p"].get(price) && !doc["q"].get(quantity)) {
+                std::cout << "BTC/USDT Price: " << price.get_string().value() 
+                          << ", Quantity: " << quantity.get_string().value() 
+                          << std::endl;
+            } else {
+                std::cerr << "Invalid trade data format" << std::endl;
             }
         },
-        // 连接关闭时触发的事件
-        .close = [](auto *ws, int code, std::string_view msg) {
-            std::cout << "🔌 Disconnected: " << code << ", " << msg << "\n";
+        .close = [](WebSocket<false, true, PerSocketData>* webSocket, int code, std::string_view msg) {
+            std::cout << "Disconnected. Code: " << code << std::endl;
         }
-    }).connect("wss://stream.binance.com:9443/ws/btcusdt@trade", nullptr);
+    };
 
-    // 运行事件循环
-    uWS::Loop::get()->run();
+    // 连接到 Binance WebSocket
+    loop->connect<PerSocketData>("wss://stream.binance.com:9443/ws/btcusdt@trade", behavior, {});
+    loop->run();
+
     return 0;
 }
