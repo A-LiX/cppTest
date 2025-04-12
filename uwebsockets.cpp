@@ -36,7 +36,7 @@ int main() {
     });
 
     // 发起 WebSocket 连接
-    app.connect("wss://stream.binance.com:9443/stream?streams=", [](auto* res, auto* req) {
+    app.connect("wss://stream.binance.com:9443/stream?streams=btcusdt@trade", [](auto* res, auto* req) {
         std::cout << "WebSocket connection established!" << std::endl;
     });
 
