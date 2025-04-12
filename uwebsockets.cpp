@@ -21,19 +21,22 @@ int main() {
         .compression = uWS::DISABLED, // 禁用压缩
         .maxPayloadLength = 16 * 1024, // 设置最大负载长度
         .open = [](auto* ws) {
-            std::cout << "Connected to Binance!" << std::endl;
+            std::cout << "WebSocket opened!" << std::endl;
 
             // 发送订阅请求
             const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
             ws->send(subscribeMsg, uWS::OpCode::TEXT);
         },
         .message = [&parser](auto* ws, std::string_view message, uWS::OpCode opCode) {
+            std::cout << "Received message: " << message << std::endl;
+
             // 使用 simdjson 解析消息
             simdjson::padded_string_view json_view(message.data(), message.size());
             simdjson::ondemand::document doc;
 
             if (auto error = parser.iterate(json_view).get(doc)) {
                 std::cerr << "JSON Parse Error: " << error << std::endl;
+                std::cerr << "Raw message: " << message << std::endl;
                 return;
             }
 
@@ -53,10 +56,13 @@ int main() {
 
     // 发起 WebSocket 连接
     app.connect("wss://stream.binance.com:9443/ws/btcusdt@trade", [](auto* res, auto* req) {
-        // 处理连接成功后的逻辑
         std::cout << "WebSocket connection established!" << std::endl;
     });
 
     // 运行事件循环
+    std::cout << "Starting event loop..." << std::endl;
     app.run();
+    std::cout << "Event loop ended." << std::endl;
+
+    return 0;
 }
