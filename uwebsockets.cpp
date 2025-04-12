@@ -1,60 +1,54 @@
-#include <uWebSockets/App.h>
+#include <uwebsockets/App.h>
 #include <iostream>
-#include <simdjson.h>  // 使用 simdjson 替代 jsoncpp
+#include <simdjson.h>
 
 using namespace uWS;
 
 int main() {
-    struct PerSocketData { /* 会话数据（可选） */ };
+    struct PerSocketData {}; // 保留会话数据占位
 
-    // 初始化 simdjson 解析器（线程安全）
+    // 初始化 simdjson 解析器
     simdjson::ondemand::parser parser;
-    uWS::Loop* loop = uWS::Loop::get();
 
-    WebSocket<false, true, PerSocketData>* ws = nullptr;
+    // 使用 uWS::App 替代直接操作 Loop
+    uWS::App app = uWS::App()
+        .ws<PerSocketData>("/*", { // 配置 WebSocket 行为模板
+            .compression = DISABLED,
+            .maxPayloadLength = 16 * 1024,
+            .open = [](auto* ws) {
+                std::cout << "Connected to Binance!" << std::endl;
 
-    WebSocketBehavior behavior{
-        .compression = uWS::DISABLED,
-        .maxPayloadLength = 16 * 1024,
-        .open = [&ws](WebSocket<false, true, PerSocketData>* webSocket) {
-            std::cout << "Connected to Binance!" << std::endl;
-            ws = webSocket;
+                // 发送订阅请求
+                const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
+                ws->send(subscribeMsg, OpCode::TEXT);
+            },
+            .message = [&parser](auto* ws, std::string_view message, OpCode opCode) {
+                // 使用 simdjson 解析消息
+                simdjson::padded_string_view json_view(message.data(), message.size());
+                simdjson::ondemand::document doc;
 
-            // 订阅 BTC/USDT 交易流
-            const char* subscribeMsg = R"({"method":"SUBSCRIBE","params":["btcusdt@trade"],"id":1})";
-            webSocket->send(subscribeMsg, uWS::OpCode::TEXT);
-        },
-        .message = [&parser](WebSocket<false, true, PerSocketData>* webSocket, 
-                            std::string_view message, 
-                            uWS::OpCode opCode) {
-            // 使用 simdjson 解析消息
-            simdjson::padded_string_view json_view(message.data(), message.size());
-            simdjson::ondemand::document doc;
+                if (auto error = parser.iterate(json_view).get(doc)) {
+                    std::cerr << "JSON Parse Error: " << error << std::endl;
+                    return;
+                }
 
-            // 尝试解析 JSON
-            if (auto error = parser.iterate(json_view).get(doc)) {
-                std::cerr << "JSON Parse Error: " << error << std::endl;
-                return;
+                simdjson::ondemand::value price, quantity;
+                if (!doc["p"].get(price) && !doc["q"].get(quantity)) {
+                    std::cout << "BTC/USDT Price: " << price.get_string().value() 
+                              << ", Quantity: " << quantity.get_string().value() 
+                              << std::endl;
+                } else {
+                    std::cerr << "Invalid trade data format" << std::endl;
+                }
+            },
+            .close = [](auto* ws, int code, std::string_view msg) {
+                std::cout << "Disconnected. Code: " << code << std::endl;
             }
+        });
 
-            // 提取交易价格和数量（直接访问字段）
-            simdjson::ondemand::value price, quantity;
-            if (!doc["p"].get(price) && !doc["q"].get(quantity)) {
-                std::cout << "BTC/USDT Price: " << price.get_string().value() 
-                          << ", Quantity: " << quantity.get_string().value() 
-                          << std::endl;
-            } else {
-                std::cerr << "Invalid trade data format" << std::endl;
-            }
-        },
-        .close = [](WebSocket<false, true, PerSocketData>* webSocket, int code, std::string_view msg) {
-            std::cout << "Disconnected. Code: " << code << std::endl;
-        }
-    };
+    // 连接到 Binance WebSocket（客户端模式）
+    app.connect("wss://stream.binance.com:9443/ws/btcusdt@trade", nullptr, {}, 5000);
 
-    // 连接到 Binance WebSocket
-    loop->connect<PerSocketData>("wss://stream.binance.com:9443/ws/btcusdt@trade", behavior, {});
-    loop->run();
-
-    return 0;
+    // 运行事件循环
+    app.run();
 }
