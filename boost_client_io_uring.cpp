@@ -1,7 +1,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/connect.hpp>
-#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ip/tcp.hpp>  // 确保包含这个头文件
 #include <boost/asio/posix/stream_descriptor.hpp>
 #include <liburing.h>
 #include <fcntl.h>
@@ -64,7 +64,7 @@ int main()
     const std::string target = "/ws/btcusdt@trade";
 
     // 解析 DNS
-    tcp::resolver resolver(ioc);
+    net::ip::tcp::resolver resolver(ioc);  // 使用正确的类型
     boost::system::error_code err;
     auto const results = resolver.resolve(host, port, err);
     if (err)
