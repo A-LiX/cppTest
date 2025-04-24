@@ -1,31 +1,60 @@
 #include <iostream>
 #include <thread>
-#include <atomic>
 #include <vector>
+#include <chrono>
+#include <atomic>
+#include "lock_free_ring_buffer.hpp"  // 替换为你的头文件名或内联定义
 
-std::atomic<int> counter(0); // 原子变量
-
-void increment(int times) {
-    for (int i = 0; i < times; ++i) {
-        counter.fetch_add(1, std::memory_order_relaxed);
-        // 或者：counter++;
-    }
-}
+constexpr size_t kCapacity = 1024;
+constexpr size_t kProducerCount = 4;
+constexpr size_t kConsumerCount = 4;
+constexpr size_t kOperationsPerProducer = 100000;
 
 int main() {
-    const int thread_count = 10;
-    const int add_times = 100000;
+    LockFreeRingBuffer<int, kCapacity> queue;
+    std::atomic<size_t> totalConsumed{0};
 
-    std::vector<std::thread> threads;
+    auto start = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < thread_count; ++i) {
-        threads.emplace_back(increment, add_times);
+    std::vector<std::thread> producers;
+    std::vector<std::thread> consumers;
+
+    // 启动生产者线程
+    for (size_t i = 0; i < kProducerCount; ++i) {
+        producers.emplace_back([&queue]() {
+            for (size_t j = 0; j < kOperationsPerProducer; ++j) {
+                while (!queue.enqueue(j)) {
+                    std::this_thread::yield();  // 避免忙等
+                }
+            }
+        });
     }
 
-    for (auto& t : threads) {
-        t.join();
+    // 启动消费者线程
+    for (size_t i = 0; i < kConsumerCount; ++i) {
+        consumers.emplace_back([&queue, &totalConsumed]() {
+            int value;
+            while (true) {
+                if (totalConsumed.load() >= kProducerCount * kOperationsPerProducer) break;
+
+                if (queue.dequeue(value)) {
+                    totalConsumed.fetch_add(1, std::memory_order_relaxed);
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        });
     }
 
-    std::cout << "Final counter value: " << counter << std::endl;
+    for (auto& t : producers) t.join();
+    for (auto& t : consumers) t.join();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "All threads done.\n";
+    std::cout << "Total consumed: " << totalConsumed.load() << "\n";
+    std::cout << "Time taken: " << ms << " ms\n";
+
     return 0;
 }

@@ -139,9 +139,10 @@ int main()
 
         size_t size = buffer.size();
         auto data = static_cast<char *>(buffer.data().data());
-
-        // simdjson::padded_string padded_data(data, size);
-        // auto doc_result = parser.iterate(data, size);
+        
+        //simdjson::padded_string_view padded_data(data, size);
+        //simdjson::padded_string padded_data(data, size);
+        //auto doc_result = parser.iterate(data, size);
         auto doc_result = parser.iterate(data, size, TRADE_BUFFER_SIZE);
         if (doc_result.error())
         {

@@ -1,37 +1,41 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "aco.h" // 包含 libaco 的头文件
+#include <iostream>
+#include <libcopp/coroutine/coroutine_context_container.h>
+#include <libcopp/coroutine/coroutine_context_fiber.h>
+// #include <anssock.h> // DPDK-ANS socket 头文件，实际项目需包含
 
-// 定义一个简单的协程函数
-void task_func() {
-    int i = 0;
-    while (i < 5) {
-        printf("Task running: step %d (coroutine: %p)\n", i, aco_get_co());
-        i++;
-        aco_yield(); // 主动让出协程的执行权
+// 假设有一个 DPDK-ANS socket fd
+int ans_fd = -1; // 实际代码中应通过 ans_socket/ans_bind/ans_listen/ans_accept 获得
+
+void ans_coroutine_func(void* arg) {
+    int* fd = static_cast<int*>(arg);
+    char buf[2048];
+    for (int i = 0; i < 3; ++i) {
+        // 伪代码：阻塞式接收数据（实际应为非阻塞+事件驱动）
+        int len = ans_recv(*fd, buf, sizeof(buf), 0);
+        if (len > 0) {
+            std::cout << "coroutine: received " << len << " bytes from ans fd " << *fd << std::endl;
+        } else {
+            std::cout << "coroutine: no data, yield..." << std::endl;
+        }
+        copp::this_coroutine::yield();
     }
-    printf("Task finished (coroutine: %p)\n", aco_get_co());
 }
 
 int main() {
-    // 初始化主协程上下文
-    aco_thread_init(NULL);
+    // ... DPDK-ANS 初始化、ans_socket/ans_bind/ans_listen/ans_accept 等 ...
+    // ans_fd = ans_socket(...); ans_bind(...); ans_listen(...); ans_accept(...);
 
-    // 创建协程的共享栈（所有协程可以共享同一个栈）
-    aco_share_stack_t *share_stack = aco_share_stack_new(0);
+    // 这里只演示协程调度
+    copp::coroutine_context_container<copp::coroutine_context_fiber> co;
+    co.start(ans_coroutine_func, &ans_fd);
 
-    // 创建协程
-    aco_t *co = aco_create(NULL, share_stack, 0, task_func, NULL);
-
-    // 运行协程
-    while (!aco_is_end(co)) {
-        printf("Resuming coroutine: %p\n", co);
-        aco_resume(co); // 恢复协程的执行
+    for (int i = 0; i < 3; ++i) {
+        std::cout << "main: before resume coroutine" << std::endl;
+        co.resume();
+        std::cout << "main: after resume coroutine" << std::endl;
     }
-
-    // 清理资源
-    aco_destroy(co);
-    aco_share_stack_destroy(share_stack);
-
     return 0;
 }
+
+// 实际 DPDK-ANS 场景下，建议将每个连接/会话的收发逻辑放到协程中，主线程/调度线程负责事件轮询和协程调度。
+// 这里只是结构示例，具体收发和事件驱动需结合 ANS 的 epoll/select 机制和协程库的调度能力实现.
