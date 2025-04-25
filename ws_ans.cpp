@@ -11,16 +11,6 @@
 #include <netinet/in.h>
 #include <netdb.h> // For gethostbyname
 
-// 如果是 macOS (Apple 平台)，则使用系统原生 socket；否则（如 Linux）使用 ANS socket 实现
-#ifdef __linux__
-#include "ans_socket.h"
-#define socket ans_socket
-#define connect ans_connect
-#define close ans_close
-#define read ans_read
-#define write ans_write
-#endif
-
 // g++ -std=c++17 -I/opt/homebrew/include -L/opt/homebrew/lib  -lboost_system -lboost_thread -lssl -lcrypto -lpthread -lsimdjson -o ws_ans ws_ans.cpp
 
 namespace beast = boost::beast;
