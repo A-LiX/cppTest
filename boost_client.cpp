@@ -47,7 +47,6 @@ int main()
 
     // 配置 spdlog 异步日志（队列大小为 8192）
     spdlog::init_thread_pool(8192, 1); // 日志队列大小为 8192，1 个后台线程处理日志
-
     // 配置滚动日志（按时间滚动：1周）
     auto weekly_logger = spdlog::create_async<spdlog::sinks::daily_file_sink_mt>(
         "weekly_logger", "./boost_client.log", 0, 0); // 每天午夜滚动

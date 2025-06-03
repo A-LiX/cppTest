@@ -91,39 +91,59 @@ public:
     }
 };
 
-// MPSC Lock-Free Ring Buffer
+// MPSC Lock-Free Ring Buffer (修正版)
 template <typename T, size_t Capacity>
 class LockFreeMPSCQueue
 {
 private:
-    static_assert((Capacity & (Capacity - 1)) == 0, "Capacity must be a power of two");
-
-    T buffer[Capacity];
+    struct Slot {
+        std::atomic<size_t> sequence;
+        T data;
+    };
+    static constexpr size_t kSize = Capacity;
+    Slot buffer[kSize];
     std::atomic<size_t> head{0}; // 由消费者线程独占访问
     std::atomic<size_t> tail{0}; // 多个生产者共享访问
 
 public:
-    inline bool enqueue(const T &value)
-    {
-        size_t pos = tail.fetch_add(1, std::memory_order_acq_rel);
-        if (pos - head.load(std::memory_order_acquire) >= Capacity)
-        {
-            return false; // 队列满
+    LockFreeMPSCQueue() {
+        for (size_t i = 0; i < kSize; ++i) {
+            buffer[i].sequence.store(i, std::memory_order_relaxed);
         }
-        buffer[pos % Capacity] = value;
-        return true;
     }
 
-    inline bool dequeue(T &result)
-    {
-        size_t h = head.load(std::memory_order_relaxed);
-        if (h >= tail.load(std::memory_order_acquire))
-        {
-            return false; // 队列空
+    inline bool enqueue(const T &value) {
+        size_t pos = tail.load(std::memory_order_relaxed);
+        while (true) {
+            Slot &slot = buffer[pos % kSize];
+            size_t seq = slot.sequence.load(std::memory_order_acquire);
+            intptr_t diff = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos);
+            if (diff == 0) {
+                if (tail.compare_exchange_weak(pos, pos + 1, std::memory_order_relaxed)) {
+                    slot.data = value;
+                    slot.sequence.store(pos + 1, std::memory_order_release);
+                    return true;
+                }
+            } else if (diff < 0) {
+                return false; // 满了
+            } else {
+                pos = tail.load(std::memory_order_relaxed); // retry
+            }
         }
-        result = buffer[h % Capacity];
-        head.store(h + 1, std::memory_order_release);
-        return true;
+    }
+
+    inline bool dequeue(T &result) {
+        size_t pos = head.load(std::memory_order_relaxed);
+        Slot &slot = buffer[pos % kSize];
+        size_t seq = slot.sequence.load(std::memory_order_acquire);
+        intptr_t diff = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos + 1);
+        if (diff == 0) {
+            head.store(pos + 1, std::memory_order_relaxed);
+            result = slot.data;
+            slot.sequence.store(pos + kSize, std::memory_order_release);
+            return true;
+        }
+        return false; // 空
     }
 };
 
