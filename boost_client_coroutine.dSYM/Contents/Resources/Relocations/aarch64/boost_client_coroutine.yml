@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/lixiang/cppTest/boost_client_coroutine'
-relocations:     []
-...
