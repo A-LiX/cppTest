@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <string>
+#include <chrono>
 
 namespace beast = boost::beast;         // Boost.Beast 命名空间
 namespace websocket = beast::websocket; // WebSocket 相关
@@ -33,7 +34,7 @@ int main()
 #include <sched.h>
 #include <stdlib.h>
 #include <unistd.h>
-        // 设置 CPU 亲和性
+    // 设置 CPU 亲和性
     cpu_set_t mask;
     CPU_ZERO(&mask);   // 清空 CPU 集合
     CPU_SET(1, &mask); // 设置 CPU 核心 1
@@ -125,7 +126,7 @@ int main()
         // 在 while 循环中实现忙等待
         while (ws.next_layer().next_layer().available() == 0)
         {
-            //std::this_thread::sleep_for(std::chrono::nanoseconds(100)); // 短暂休眠以避免 100% CPU 占用
+            // std::this_thread::sleep_for(std::chrono::nanoseconds(100)); // 短暂休眠以避免 100% CPU 占用
         }
 
         // 读取消息
@@ -138,11 +139,16 @@ int main()
 
         size_t size = buffer.size();
         auto data = static_cast<char *>(buffer.data().data());
-        
-        //simdjson::padded_string_view padded_data(data, size);
-        //simdjson::padded_string padded_data(data, size);
-        //auto doc_result = parser.iterate(data, size);
+
+        // simdjson::padded_string_view padded_data(data, size);
+        // simdjson::padded_string padded_data(data, size);
+        // auto doc_result = parser.iterate(data, size);
+
+        auto start = std::chrono::high_resolution_clock::now();
         auto doc_result = parser.iterate(data, size, TRADE_BUFFER_SIZE);
+        auto end = std::chrono::high_resolution_clock::now();
+        double elapsed_us = std::chrono::duration<double, std::micro>(end - start).count();
+        std::cout << "Iteration " << ": " << elapsed_us << " us" << std::endl;
         if (doc_result.error())
         {
             spdlog::error("JSON Parsing Error: {}", simdjson::error_message(doc_result.error()));
