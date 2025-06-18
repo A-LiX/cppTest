@@ -109,13 +109,20 @@ int main()
             continue;
         }
 
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          std::chrono::system_clock::now().time_since_epoch())
+                          .count();
+
         auto &doc = doc_result.value_unsafe();
 
         // 提取字段值（示例）
         std::string_view event_type = doc["e"].get_string().value_unsafe();
         std::string_view symbol = doc["s"].get_string().value_unsafe();
+        int64_t trade_time_ms = doc["T"].get_int64().value_unsafe();
 
         std::cout << "Event Type: " << event_type << ", Symbol: " << symbol << std::endl;
+        int64_t latency_ms = now_ms - trade_time_ms;
+        std::cout << ", Latency (us): " << latency_ms << std::endl;
 
         buffer.consume(size);
     }
