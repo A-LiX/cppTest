@@ -109,7 +109,7 @@ int main()
             continue;
         }
 
-        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
                           .count();
 
@@ -121,8 +121,8 @@ int main()
         int64_t trade_time_ms = doc["T"].get_int64().value_unsafe();
 
         std::cout << "Event Type: " << event_type << ", Symbol: " << symbol << std::endl;
-        int64_t latency_ms = now_ms - trade_time_ms;
-        std::cout << ", Latency (us): " << latency_ms << std::endl;
+        int64_t latency_ms = now_ns - trade_time_ms*1000000;
+        std::cout << ", Latency (ns): " << latency_ms << std::endl;
 
         buffer.consume(size);
     }
