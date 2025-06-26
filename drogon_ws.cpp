@@ -1,66 +1,72 @@
+#include <drogon/drogon.h>
 #include <drogon/WebSocketClient.h>
-#include <drogon/HttpAppFramework.h>
-#include <iostream>
-#include <thread>
-#include <chrono>
+#include <json/json.h>
 
 using namespace drogon;
 using namespace std::chrono_literals;
 
-int main(int argc, char *argv[])
-{
-    // Binance 行情 WebSocket 地址，单币对不使用 streams
-    std::string server = "wss://stream.binance.com:9443";
-    std::string path = "/ws/btcusdt@ticker";
+int main() {
+    // 设置日志级别（可选）
+    trantor::Logger::setLogLevel(trantor::Logger::kDebug);
 
-    auto wsPtr = WebSocketClient::newWebSocketClient(server);
-    auto req = HttpRequest::newHttpRequest();
-    req->setPath(path);
-    // 不需要手动添加 Host 头
+    // 创建WebSocket客户端
+    auto wsClient = WebSocketClient::newWebSocketClient("wss://stream.binance.com:9443");
+    // 启用SSL证书验证
 
-    wsPtr->setMessageHandler([](const std::string &message,
-                                const WebSocketClientPtr &,
-                                const WebSocketMessageType &type) {
-        std::string messageType = "Unknown";
-        if (type == WebSocketMessageType::Text)
-            messageType = "text";
-        else if (type == WebSocketMessageType::Pong)
-            messageType = "pong";
-        else if (type == WebSocketMessageType::Ping)
-            messageType = "ping";
-        else if (type == WebSocketMessageType::Binary)
-            messageType = "binary";
-        else if (type == WebSocketMessageType::Close)
-            messageType = "Close";
+    // 创建请求对象
+    HttpRequestPtr req = HttpRequest::newHttpRequest();
+    req->setPath("/ws/btcusdt@trade"); // 订阅BTC/USDT实时交易流
 
-        LOG_INFO << "Binance MultiStream (" << messageType << "): " << message;
+    // 连接并订阅
+    wsClient->setMessageHandler([](const std::string& message,
+                                  const WebSocketClientPtr& client,
+                                  const WebSocketMessageType& type) {
+        // 确保是文本消息
+        if (type == WebSocketMessageType::Text) {
+            try {
+                // 解析JSON
+                Json::Value jsonData;
+                Json::Reader reader;
+                if (reader.parse(message, jsonData)) {
+                    // 提取交易数据
+                    auto symbol = jsonData["s"].asString();
+                    auto price = jsonData["p"].asString();
+                    auto quantity = jsonData["q"].asString();
+                    auto tradeTime = jsonData["T"].asUInt64();
+                    
+                    // 打印交易信息（实际应用中应处理数据）
+                    LOG_INFO << "交易对: " << symbol
+                             << " | 价格: " << price
+                             << " | 数量: " << quantity
+                             << " | 时间: " << tradeTime;
+                } else {
+                    LOG_ERROR << "JSON解析失败: " << message;
+                }
+            } catch (const std::exception& e) {
+                LOG_ERROR << "处理错误: " << e.what();
+            }
+        }
     });
 
-    wsPtr->setConnectionClosedHandler([](const WebSocketClientPtr &) {
-        LOG_INFO << "WebSocket connection closed!";
+    // 设置连接关闭处理
+    wsClient->setConnectionClosedHandler([](const WebSocketClientPtr& client) {
+        LOG_WARN << "WebSocket连接已关闭";
     });
 
-    LOG_INFO << "Connecting to Binance WebSocket at " << server << path;
-    wsPtr->connectToServer(
+    // 发起连接
+    wsClient->connectToServer(
         req,
-        [wsPtr](ReqResult r,
-           const HttpResponsePtr &,
-           const WebSocketClientPtr &) {
-            if (r != ReqResult::Ok)
-            {
-                LOG_ERROR << "Failed to establish WebSocket connection!";
-                wsPtr->stop();
+        [](ReqResult r, const HttpResponsePtr&, const WebSocketClientPtr& ws) {
+            if (r != ReqResult::Ok) {
+                LOG_ERROR << "连接失败: " << (int)r;
+                app().quit();
                 return;
             }
-            LOG_INFO << "WebSocket connected!";
-            // 不需要再发送 SUBSCRIBE 消消息
+            LOG_INFO << "成功连接到Binance WebSocket";
         });
 
-    // 60秒后退出
-    //app().getLoop()->runAfter(60, []() { app().quit(); });
-
-    app().setLogLevel(trantor::Logger::kDebug);
+    // 运行主事件循环
+    app().setLogLevel(trantor::Logger::kWarn);
     app().run();
-    LOG_INFO << "bye!";
     return 0;
 }
