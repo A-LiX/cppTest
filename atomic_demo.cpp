@@ -10,8 +10,8 @@ constexpr size_t kProducerCount = 4;
 constexpr size_t kConsumerCount = 4;
 constexpr size_t kOperationsPerProducer = 100000;
 
+
 int main() {
-    LockFreeRingBuffer<int, kCapacity> queue;
     std::atomic<size_t> totalConsumed{0};
 
     auto start = std::chrono::high_resolution_clock::now();

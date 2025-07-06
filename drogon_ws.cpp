@@ -1,72 +1,132 @@
-#include <drogon/drogon.h>
 #include <drogon/WebSocketClient.h>
-#include <json/json.h>
+#include <drogon/HttpAppFramework.h>
+#include <iostream>
+#include <chrono>
 
 using namespace drogon;
 using namespace std::chrono_literals;
 
-int main() {
-    // 设置日志级别（可选）
-    trantor::Logger::setLogLevel(trantor::Logger::kDebug);
+int main(int argc, char *argv[])
+{
+    // Binance 行情 WebSocket
+    std::string binance_server = "wss://stream.binance.com:9443";
+    std::string binance_path = "/stream?streams=btcusdt@trade";
 
-    // 创建WebSocket客户端
-    auto wsClient = WebSocketClient::newWebSocketClient("wss://stream.binance.com:9443");
-    // 启用SSL证书验证
+    // Crypto.com 行情 WebSocket
+    std::string crypto_server = "wss://stream.crypto.com";
+    std::string crypto_path = "/v2/market";
 
-    // 创建请求对象
-    HttpRequestPtr req = HttpRequest::newHttpRequest();
-    req->setPath("/ws/btcusdt@trade"); // 订阅BTC/USDT实时交易流
+    // 创建 Binance WebSocket 客户端
+    auto binanceWs = WebSocketClient::newWebSocketClient(binance_server);
+    auto binanceReq = HttpRequest::newHttpRequest();
+    binanceReq->setPath(binance_path);
 
-    // 连接并订阅
-    wsClient->setMessageHandler([](const std::string& message,
-                                  const WebSocketClientPtr& client,
-                                  const WebSocketMessageType& type) {
-        // 确保是文本消息
-        if (type == WebSocketMessageType::Text) {
-            try {
-                // 解析JSON
-                Json::Value jsonData;
-                Json::Reader reader;
-                if (reader.parse(message, jsonData)) {
-                    // 提取交易数据
-                    auto symbol = jsonData["s"].asString();
-                    auto price = jsonData["p"].asString();
-                    auto quantity = jsonData["q"].asString();
-                    auto tradeTime = jsonData["T"].asUInt64();
-                    
-                    // 打印交易信息（实际应用中应处理数据）
-                    LOG_INFO << "交易对: " << symbol
-                             << " | 价格: " << price
-                             << " | 数量: " << quantity
-                             << " | 时间: " << tradeTime;
-                } else {
-                    LOG_ERROR << "JSON解析失败: " << message;
-                }
-            } catch (const std::exception& e) {
-                LOG_ERROR << "处理错误: " << e.what();
-            }
-        }
+    // 创建 Crypto.com WebSocket 客户端
+    auto cryptoWs = WebSocketClient::newWebSocketClient(crypto_server);
+    auto cryptoReq = HttpRequest::newHttpRequest();
+    cryptoReq->setPath(crypto_path);
+
+    // Binance 消息处理
+    binanceWs->setMessageHandler([](const std::string &message,
+                                    const WebSocketClientPtr &,
+                                    const WebSocketMessageType &type) {
+        std::string messageType = "Unknown";
+        if (type == WebSocketMessageType::Text)
+            messageType = "text";
+        else if (type == WebSocketMessageType::Pong)
+            messageType = "pong";
+        else if (type == WebSocketMessageType::Ping)
+            messageType = "ping";
+        else if (type == WebSocketMessageType::Binary)
+            messageType = "binary";
+        else if (type == WebSocketMessageType::Close)
+            messageType = "Close";
+
+        auto now = std::chrono::system_clock::now();
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+
+        LOG_INFO << "[Binance] (" << messageType << ", local_ns=" << ns << "): " << message;
     });
 
-    // 设置连接关闭处理
-    wsClient->setConnectionClosedHandler([](const WebSocketClientPtr& client) {
-        LOG_WARN << "WebSocket连接已关闭";
+    binanceWs->setConnectionClosedHandler([](const WebSocketClientPtr &) {
+        LOG_INFO << "[Binance] WebSocket connection closed!";
     });
 
-    // 发起连接
-    wsClient->connectToServer(
-        req,
-        [](ReqResult r, const HttpResponsePtr&, const WebSocketClientPtr& ws) {
-            if (r != ReqResult::Ok) {
-                LOG_ERROR << "连接失败: " << (int)r;
-                app().quit();
+    // Crypto.com 消息处理
+    cryptoWs->setMessageHandler([](const std::string &message,
+                                   const WebSocketClientPtr &ws,
+                                   const WebSocketMessageType &type) {
+        std::string messageType = "Unknown";
+        if (type == WebSocketMessageType::Text)
+            messageType = "text";
+        else if (type == WebSocketMessageType::Pong)
+            messageType = "pong";
+        else if (type == WebSocketMessageType::Ping)
+            messageType = "ping";
+        else if (type == WebSocketMessageType::Binary)
+            messageType = "binary";
+        else if (type == WebSocketMessageType::Close)
+            messageType = "Close";
+
+        auto now = std::chrono::system_clock::now();
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+
+        LOG_INFO << "[Crypto.com] (" << messageType << ", local_ns=" << ns << "): " << message;
+    });
+
+    cryptoWs->setConnectionClosedHandler([](const WebSocketClientPtr &) {
+        LOG_INFO << "[Crypto.com] WebSocket connection closed!";
+    });
+
+    LOG_INFO << "Connecting to Binance WebSocket at " << binance_server << binance_path;
+    binanceWs->connectToServer(
+        binanceReq,
+        [](ReqResult r,
+           const HttpResponsePtr &,
+           const WebSocketClientPtr &wsPtr) {
+            if (r != ReqResult::Ok)
+            {
+                LOG_ERROR << "[Binance] Failed to establish WebSocket connection!";
+                wsPtr->stop();
                 return;
             }
-            LOG_INFO << "成功连接到Binance WebSocket";
+            LOG_INFO << "[Binance] WebSocket connected!";
         });
 
-    // 运行主事件循环
-    app().setLogLevel(trantor::Logger::kWarn);
+    LOG_INFO << "Connecting to Crypto.com WebSocket at " << crypto_server << crypto_path;
+    cryptoWs->connectToServer(
+        cryptoReq,
+        [cryptoWs](ReqResult r,
+           const HttpResponsePtr &,
+           const WebSocketClientPtr &wsPtr) {
+            if (r != ReqResult::Ok)
+            {
+                LOG_ERROR << "[Crypto.com] Failed to establish WebSocket connection!";
+                wsPtr->stop();
+                return;
+            }
+            LOG_INFO << "[Crypto.com] WebSocket connected!";
+            // 连接成功后订阅 ticker.BTC_USDT
+            std::string sub = R"({"id":1,"method":"subscribe","params":{"channels":["ticker.BTC_USDT"]}})";
+            wsPtr->getConnection()->send(sub);
+        });
+
+    // 15秒后退出
+    //app().getLoop()->runAfter(6000, []() { app().quit(); });
+
+    // 设置事件循环线程数，例如4线程
+    app().setThreadNum(4);
+
+    app().setLogLevel(trantor::Logger::kDebug);
     app().run();
+    LOG_INFO << "bye!";
     return 0;
 }
+
+//g++ drogon_ws.cpp -o ws_drogon -std=c++20 \
+  -I/opt/homebrew/include \
+  -L/opt/homebrew/lib \
+  -ldrogon -ltrantor -ljsoncpp \
+  -lssl -lcrypto \
+  -lz -lcares -lhiredis -lsqlite3 \
+  -lpthread

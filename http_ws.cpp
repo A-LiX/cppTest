@@ -113,7 +113,7 @@ public:
                         c ^= mask_key[i % 4];
                     payload.push_back(c);
                 }
-                //std::cout << "WebSocket Text Frame: " << payload << std::endl;
+                // std::cout << "WebSocket Text Frame: " << payload << std::endl;
             }
             // ping帧，自动回复pong
             else if (opcode == 9)
