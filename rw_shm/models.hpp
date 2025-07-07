@@ -15,7 +15,7 @@ struct Depth {
 
 // Binance 成交 tick（trade event）
 struct TradeTick {
-    std::string symbol;   // 交易对，如 BTCUSDT
+    char symbol[7];   // 交易对，如 BTCUSDT
     double price;         // 成交价格
     double quantity;      // 成交数量
     uint64_t trade_id;    // 成交 ID
