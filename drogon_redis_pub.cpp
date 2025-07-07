@@ -2,41 +2,44 @@
 #include <drogon/WebSocketClient.h>
 #include <trantor/utils/Logger.h>
 #include <chrono>
-#include <cstdlib>
-#include <ctime>
 
 using namespace drogon;
 
 int main()
 {
     app().setThreadNum(1);
+
     app().createRedisClient("127.0.0.1", 6379);
 
     std::string redisStream = "my_stream";
-    std::string binanceWsUrl = "wss://stream.binance.com:9443";
-    std::string binancePath = "/stream?streams=btcusdt@trade/btcusdt@depth20@100ms"; // 订阅 BTC 和 ETH
+    const std::string binanceWsUrl = "wss://stream.binance.com:9443";
+    const std::string binancePath = "/stream?streams=btcusdt@trade/btcusdt@depth20@100ms";
+
+    // 使用 shared_ptr 保持连接持久存在
+    std::shared_ptr<WebSocketClient> wsClient = nullptr;
 
     std::function<void()> connectToBinance;
 
     connectToBinance = [&]()
     {
-        auto wsClient = WebSocketClient::newWebSocketClient(binanceWsUrl);
+        wsClient = WebSocketClient::newWebSocketClient(binanceWsUrl);
         auto wsReq = HttpRequest::newHttpRequest();
         wsReq->setPath(binancePath);
 
-        wsClient->setMessageHandler([wsClient, &connectToBinance](const std::string &message,
-                                                                  const WebSocketClientPtr &wsConn,
-                                                                  const WebSocketMessageType &type)
+        wsClient->setMessageHandler([=](const std::string &message,
+                                        const WebSocketClientPtr &wsConn,
+                                        const WebSocketMessageType &type)
                                     {
-
-            if (type == WebSocketMessageType::Ping){
+            if (type == WebSocketMessageType::Ping) {
                 wsConn->getConnection()->send(std::string(), WebSocketMessageType::Pong);
-                LOG_INFO << "Received Ping, sent Pong.";
+                LOG_INFO << "[WS] Received Ping -> sent Pong.";
+                //wsClient->stop();
                 return;
             }
+
             if (type != WebSocketMessageType::Text) return;
+
             std::string redisChannel = "my_channel";
-            // 收到 Binance 行情，发布到 Redis 频道
             auto redisClient = app().getRedisClient();
             if (!redisClient) {
             LOG_ERROR << "RedisClient is nullptr!";
@@ -61,36 +64,26 @@ int main()
                                                 //connectToBinance();
                                                 return; });
 
-        wsClient->connectToServer(
-            wsReq,
-            [&](ReqResult r, const HttpResponsePtr &, const WebSocketClientPtr &wsPtr)
-            {
-                if (r != ReqResult::Ok)
-                {
-                    LOG_ERROR << "Failed to connect to Binance WebSocket!";
-                    wsPtr->stop();
-                    app().quit();
-                    return;
-                }
-                LOG_INFO << "Connected to wss://stream.binance.com:9443" << wsReq->getPath() << " WebSocket!";
-            });
+        // 这里处理 Text 类型的数据
+        // LOG_INFO << "[WS] Received: " << message.substr(0, 128) << "...";
+
+        wsClient->setConnectionClosedHandler([=](const WebSocketClientPtr &)
+                                             {
+            LOG_ERROR << "[WS] Connection closed. Reconnecting in 3s...";
+            app().getLoop()->runAfter(0.0, connectToBinance); });
+
+        wsClient->connectToServer(wsReq, [=](ReqResult r,
+                                             const HttpResponsePtr &,
+                                             const WebSocketClientPtr &wsPtr)
+                                  {
+            if (r != ReqResult::Ok) {
+                LOG_ERROR << "[WS] Failed to connect.";
+                app().getLoop()->runAfter(3.0, connectToBinance);
+                return;
+            }
+            LOG_INFO << "[WS] Connected to Binance: " << wsReq->getPath(); });
     };
 
-    //app().getLoop()->runEvery(5, []()
-    //                         { LOG_INFO << "Starting Binance WebSocket connection..."; });
-    // app().getLoop()->runAfter(0, connectToBinance);
     connectToBinance();
-    // 启动应用
     app().run();
-    return 0;
 }
-
-//g++ drogon_redis_pub.cpp -std=c++17 -O3\
- -I/opt/homebrew/include \
- -L/opt/homebrew/lib \
- -ldrogon -ltrantor -ljsoncpp -lhiredis \
- -lssl -lcrypto \
- -lz -lpthread \
- -lsqlite3 \
- -lcares \
- -o suber
