@@ -18,7 +18,7 @@ int main()
             tick.quantity = 0.001 * ((i % 5) + 1);
             tick.is_buyer_maker = (i % 2 == 0);
             tick.ts_exchange = tick.ts_local;
-            tick.symbol = "BTCUSDT";
+            memcpy(tick.symbol, "BTCUSDT", 7); // 固定交易对
             tick.ts_local = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                 std::chrono::high_resolution_clock::now().time_since_epoch())
                                 .count();
