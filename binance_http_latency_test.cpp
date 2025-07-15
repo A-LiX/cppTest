@@ -5,6 +5,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <nlohmann/json.hpp>
 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -32,33 +33,17 @@ int main() {
             auto start = std::chrono::high_resolution_clock::now();
             CURLcode res = curl_easy_perform(curl);
             auto end = std::chrono::high_resolution_clock::now();
-
-            long long latency_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-            if (res != CURLE_OK) {
-                std::cerr << "[# " << i + 1 << "] curl_easy_perform() failed: " << curl_easy_strerror(res) << "\n";
-            } else {
-                std::cout << "[# " << i + 1 << "] Latency: " << latency_ms << " ms\n";
-                latencies.push_back(latency_ms);
+            std::cout << "start: " << start.time_since_epoch().count() << std::endl;
+                        if (res == CURLE_OK) {
+                std::cout << "raw json: " << readBuffer << std::endl;
             }
+            std::cout << "end: " << end.time_since_epoch().count() << std::endl;
+            long long latency_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            std::cout << "latency_ms: " << latency_ms << std::endl;
 
             curl_easy_cleanup(curl);
         }
 
-    }
-
-    curl_global_cleanup();
-
-    // 统计结果
-    if (!latencies.empty()) {
-        auto [min_it, max_it] = std::minmax_element(latencies.begin(), latencies.end());
-        double avg = std::accumulate(latencies.begin(), latencies.end(), 0LL) / static_cast<double>(latencies.size());
-
-        std::cout << "\n=== Latency Summary ===\n";
-        std::cout << "Requests: " << latencies.size() << "\n";
-        std::cout << "Min: " << *min_it << " ms\n";
-        std::cout << "Max: " << *max_it << " ms\n";
-        std::cout << "Avg: " << avg << " ms\n";
     }
 
     return 0;
