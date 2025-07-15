@@ -5,7 +5,6 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
-#include <nlohmann/json.hpp>
 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -14,7 +13,7 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
 
 int main() {
     constexpr int NUM_REQUESTS = 10;
-    const char* url = "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5";
+    const char* url = "https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=5";
     std::vector<long long> latencies;
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
